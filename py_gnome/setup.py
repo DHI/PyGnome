@@ -447,7 +447,13 @@ elif sys.platform == "win32":
     #     libname = 'gnome' + suffix
     # else:
     #     libname = 'gnome.lib'
-    static_lib_files = [os.path.join(target_path(),
+    static_lib_files = None
+    if setuptools.__version__ > '55':
+        static_lib_files = [os.path.join(target_path(),
+                                        'lib_gnome',
+                                        'cy_basic_types'+ win_comp_modules_ext)]
+    else:
+        static_lib_files = [os.path.join(target_path(),
                                      'Release', 'gnome', 'cy_gnome',
                                      'cy_basic_types'+ win_comp_modules_ext)]
     libdirs = []
