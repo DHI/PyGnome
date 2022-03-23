@@ -11,7 +11,7 @@
 # conda-forge
 # NOAA-ORR-ERD
 
-python=3.8.*
+python>=3.8,<3.10
 
 # for SpatialRelease
 trimesh
@@ -19,7 +19,7 @@ shapely
 pyproj
 mapbox_earcut # from NOAA_ORR_ERD channel -- not working
 
-setuptools
+setuptools>55
 gitpython
 numpy
 scipy
@@ -64,5 +64,6 @@ notebook # this gets you Jupyter notebook without all the QT stuff
 sphinx
 sphinx_rtd_theme
 nbsphinx
+sphinx-autoapi
 
 
