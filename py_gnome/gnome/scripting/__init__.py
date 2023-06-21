@@ -54,7 +54,7 @@ from gnome.spills.spill import Spill
 from gnome.spills.release import PointLineRelease, PolygonRelease
 
 from gnome.spills.spill import (surface_point_line_spill,
-                                subsurface_plume_spill,
+                                subsurface_spill,
                                 grid_spill,
                                 spatial_release_spill,
                                 )
@@ -63,8 +63,8 @@ from gnome.spills.substance import NonWeatheringSubstance
 from gnome.spills.gnome_oil import GnomeOil
 
 from gnome.environment.wind import Wind, constant_wind
-from gnome.movers.wind_movers import (constant_wind_mover,
-                                      wind_mover_from_file,
+from gnome.movers.c_wind_movers import (constant_point_wind_mover,
+                                      point_wind_mover_from_file,
                                       )
 
 from gnome.outputters import (Renderer,
@@ -87,17 +87,22 @@ from gnome.environment import (FileGridCurrent,
                                Waves,
                                )
 
+from gnome.environment.environment_objects import IceVelocity,IceConcentration
+
 from gnome.movers import (RandomMover,
                           RandomMover3D,
-                          WindMover,
+                          PointWindMover,
                           CatsMover,
                           ComponentMover,
                           RiseVelocityMover,
-                          PyWindMover,
-                          PyCurrentMover,
+                          WindMover,
+                          CurrentMover,
                           IceAwareRandomMover,
                           SimpleMover,
                           )
+
+from gnome.movers.py_current_movers import PyCurrentMover
+from gnome.movers.py_wind_movers import PyWindMover
 
 from gnome.utilities.remote_data import get_datafile
 

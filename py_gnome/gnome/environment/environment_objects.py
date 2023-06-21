@@ -5,8 +5,8 @@ from datetime import datetime
 import netCDF4 as nc4
 import numpy as np
 
-from colander import drop
-from gnome.persist import (Boolean,
+from gnome.persist import (drop,
+                           Boolean,
                            SchemaNode,
                            ObjTypeSchema,
                            FilenameSchema,
@@ -15,7 +15,7 @@ from gnome.persist import (Boolean,
 
 import gridded
 from gnome.gnomeobject import combine_signatures
-import unit_conversion as uc
+import nucos as uc
 
 from .environment import Environment
 from .timeseries_objects_base import TimeseriesData, TimeseriesVector
@@ -31,145 +31,7 @@ from gnome.persist.validators import convertible_to_seconds
 
 from .gridcur import init_from_gridcur, GridCurReadError
 
-
-class S_Depth_T1(object):
-
-    default_terms = [['Cs_w', 's_w', 'hc', 'Cs_r', 's_rho']]
-
-    def __init__(self,
-                 bathymetry,
-                 data_file=None,
-                 dataset=None,
-                 terms={},
-                 **kwargs):
-        ds = dataset
-        if ds is None:
-            if data_file is None:
-                data_file = bathymetry.data_file
-
-                if data_file is None:
-                    raise ValueError('Need data_file or dataset '
-                                     'containing sigma equation terms')
-
-            ds = gridded.utilities.get_dataset(data_file)
-
-        self.bathymetry = bathymetry
-        self.terms = terms
-
-        if len(terms) == 0:
-            for s in S_Depth_T1.default_terms:
-                for term in s:
-                    self.terms[term] = ds[term][:]
-
-    @classmethod
-    def from_netCDF(cls, **kwargs):
-        bathymetry = Bathymetry.from_netCDF(**kwargs)
-        data_file = bathymetry.data_file,
-
-        if 'dataset' in kwargs:
-            dataset = kwargs['dataset']
-
-        if 'data_file' in kwargs:
-            data_file = kwargs['data_file']
-
-        return cls(bathymetry,
-                   data_file=data_file,
-                   dataset=dataset)
-
-    @property
-    def surface_index(self):
-        return -1
-
-    @property
-    def bottom_index(self):
-        return 0
-
-    @property
-    def num_w_levels(self):
-        return len(self.terms['s_w'])
-
-    @property
-    def num_r_levels(self):
-        return len(self.terms['s_rho'])
-
-    def _w_level_depth_given_bathymetry(self, depths, lvl):
-        s_w = self.terms['s_w'][lvl]
-        Cs_w = self.terms['Cs_w'][lvl]
-        hc = self.terms['hc']
-
-        return -(hc * (s_w - Cs_w) + Cs_w * depths)
-
-    def _r_level_depth_given_bathymetry(self, depths, lvl):
-        s_rho = self.terms['s_rho'][lvl]
-        Cs_r = self.terms['Cs_r'][lvl]
-        hc = self.terms['hc']
-
-        return -(hc * (s_rho - Cs_r) + Cs_r * depths)
-
-    def interpolation_alphas(self, points, data_shape, _hash=None):
-        '''
-        Returns a pair of values.
-
-        - The 1st value is an array of the depth indices of all the
-          particles.
-
-        - The 2nd value is an array of the interpolation alphas for the
-          particles between their depth index and depth_index + 1.
-
-        - If both values are None, then all particles are on the
-          surface layer.
-        '''
-        underwater = points[:, 2] > 0.0
-
-        if len(np.where(underwater)[0]) == 0:
-            return None, None
-
-        indices = -np.ones((len(points)), dtype=np.int64)
-        alphas = -np.ones((len(points)), dtype=np.float64)
-        depths = self.bathymetry.at(points,
-                                    datetime.now(),
-                                    _hash=_hash)[underwater]
-        pts = points[underwater]
-
-        und_ind = -np.ones((len(np.where(underwater)[0])))
-        und_alph = und_ind.copy()
-
-        if data_shape[0] == self.num_w_levels:
-            num_levels = self.num_w_levels
-            ldgb = self._w_level_depth_given_bathymetry
-        elif data_shape[0] == self.num_r_levels:
-            num_levels = self.num_r_levels
-            ldgb = self._r_level_depth_given_bathymetry
-        else:
-            raise ValueError('Cannot get depth interpolation alphas '
-                             'for data shape specified; '
-                             'does not fit r or w depth axis')
-
-        blev_depths = ulev_depths = None
-
-        for ulev in range(0, num_levels):
-            ulev_depths = ldgb(depths, ulev)
-
-            within_layer = np.where(np.logical_and(ulev_depths < pts[:, 2],
-                                                   und_ind == -1))[0]
-
-            und_ind[within_layer] = ulev
-
-            if ulev == 0:
-                und_alph[within_layer] = -2
-            else:
-                a = ((pts[:, 2].take(within_layer) -
-                      blev_depths.take(within_layer)) /
-                     (ulev_depths.take(within_layer) -
-                      blev_depths.take(within_layer)))
-                und_alph[within_layer] = a
-            blev_depths = ulev_depths
-
-        indices[underwater] = und_ind
-        alphas[underwater] = und_alph
-
-        return indices, alphas
-
+from .names import nc_names
 
 @combine_signatures
 class VelocityTS(TimeseriesVector):
@@ -364,9 +226,9 @@ class TemperatureTS(TimeseriesData, Environment):
 
 
 class GridTemperature(Variable, Environment):
-    default_names = ['water_t', 'temp']
+    default_names =  nc_names['grid_temperature']['default_names'] #['water_t', 'temp']
 
-    cf_names = ['sea_water_temperature', 'sea_surface_temperature']
+    cf_names = nc_names['grid_temperature']['cf_names'] #['sea_water_temperature', 'sea_surface_temperature']
 
     _gnome_unit = 'K'
     _default_unit_type = 'Temperature'
@@ -384,9 +246,9 @@ class SalinityTS(TimeseriesData, Environment):
 
 
 class GridSalinity(Variable, Environment):
-    default_names = ['salt']
+    default_names = nc_names['grid_salinity']['default_names'] #['salt']
 
-    cf_names = ['sea_water_salinity', 'sea_surface_salinity']
+    cf_names = nc_names['grid_salinity']['cf_names'] #['sea_water_salinity', 'sea_surface_salinity']
     _gnome_unit = 'ppt'
 
 
@@ -426,13 +288,13 @@ class WaterDensityTS(TimeseriesData, Environment):
 
 class GridSediment(Variable, Environment):
     _gnome_unit = 'ppt'
-    default_names = ['sand_06']
+    default_names = nc_names['grid_sediment']['default_names'] #['sand_06']
 
 
 class IceConcentration(Variable, Environment):
     _ref_as = ['ice_concentration', 'ice_aware']
-    default_names = ['ice_fraction', 'aice' ]
-    cf_names = ['sea_ice_area_fraction']
+    default_names = nc_names['ice_concentration']['default_names'] #['ice_fraction', 'aice' ]
+    cf_names = nc_names['ice_concentration']['cf_names'] #['sea_ice_area_fraction']
     _gnome_unit = 'fraction'
 
     def __init__(self, *args, **kwargs):
@@ -441,8 +303,8 @@ class IceConcentration(Variable, Environment):
 
 class Bathymetry(Variable):
     _gnome_unit = 'm'
-    default_names = ['h']
-    cf_names = ['depth']
+    default_names = nc_names['bathymetry']['default_names'] #['h']
+    cf_names = nc_names['bathymetry']['cf_names'] #['depth']
 
 
 class GridCurrent(VelocityGrid, Environment):
@@ -461,14 +323,14 @@ class GridCurrent(VelocityGrid, Environment):
 
     _ref_as = 'current'
     _gnome_unit = 'm/s'
-    default_names = {'u': ['u', 'U', 'water_u', 'curr_ucmp', 'u_surface', 'u_sur'],
-                     'v': ['v', 'V', 'water_v', 'curr_vcmp', 'v_surface', 'v_sur'],
-                     'w': ['w', 'W']}
-    cf_names = {'u': ['eastward_sea_water_velocity',
-                      'surface_eastward_sea_water_velocity'],
-                'v': ['northward_sea_water_velocity',
-                      'surface_northward_sea_water_velocity'],
-                'w': ['upward_sea_water_velocity']}
+    default_names = nc_names['grid_current']['default_names'] #{'u': ['u', 'U', 'water_u', 'curr_ucmp', 'u_surface', 'u_sur'],
+#                     'v': ['v', 'V', 'water_v', 'curr_vcmp', 'v_surface', 'v_sur'],
+#                     'w': ['w', 'W']}
+    cf_names = nc_names['grid_current']['cf_names']  #{'u': ['eastward_sea_water_velocity',
+#                      'surface_eastward_sea_water_velocity'],
+#                'v': ['northward_sea_water_velocity',
+#                      'surface_northward_sea_water_velocity'],
+#                'w': ['upward_sea_water_velocity']}
 
     def at(self, points, time, *args, **kwargs):
         '''
@@ -581,11 +443,11 @@ class GridWind(VelocityGrid, Environment):
     """
     _ref_as = 'wind'
     _gnome_unit = 'm/s'
-    default_names = {'u': ['air_u', 'Air_U', 'air_ucmp', 'wind_u'],
-                     'v': ['air_v', 'Air_V', 'air_vcmp', 'wind_v']}
+    default_names = nc_names['grid_wind']['default_names'] #{'u': ['air_u', 'Air_U', 'air_ucmp', 'wind_u'],
+#                     'v': ['air_v', 'Air_V', 'air_vcmp', 'wind_v']}
 
-    cf_names = {'u': ['eastward_wind', 'eastward wind'],
-                'v': ['northward_wind', 'northward wind']}
+    cf_names = nc_names['grid_wind']['cf_names'] #{'u': ['eastward_wind', 'eastward wind'],
+#                'v': ['northward_wind', 'northward wind']}
 
     def __init__(self,
                  wet_dry_mask=None,
@@ -686,17 +548,17 @@ class GridWind(VelocityGrid, Environment):
         #this function transforms those to the alternates before returning
         rv = value
         if coord_sys == 'u':
-            rv = value[:, 0]
+            rv = value[:, 0][:, None]
         elif coord_sys == 'v':
-            rv = value[:, 1]
+            rv = value[:, 1][:, None]
         elif coord_sys in ('r-theta', 'r', 'theta'):
             _mag = np.sqrt(value[:, 0] ** 2 + value[:, 1] ** 2)
             _dir = np.arctan2(value[:, 1], value[:, 0]) * 180. / np.pi
 
             if coord_sys == 'r':
-                rv = _mag
+                rv = _mag[:, None]
             elif coord_sys == 'theta':
-                rv = _dir
+                rv = _dir[:, None]
             else:
                 rv = np.column_stack((_mag, _dir))
         return rv
@@ -768,11 +630,11 @@ class LandMask(Variable):
 class IceVelocity(VelocityGrid, Environment):
     _ref_as = ['ice_velocity', 'ice_aware']
     _gnome_unit = 'm/s'
-    default_names = {'u': ['ice_u','uice'],
-                     'v': ['ice_v','vice']}
+    default_names = nc_names['ice_velocity']['default_names'] #{'u': ['ice_u','uice'],
+#                     'v': ['ice_v','vice']}
 
-    cf_names = {'u': ['eastward_sea_ice_velocity'],
-                'v': ['northward_sea_ice_velocity']}
+    cf_names = nc_names['ice_velocity']['cf_names'] #{'u': ['eastward_sea_ice_velocity'],
+#                'v': ['northward_sea_ice_velocity']}
 
 
 class IceAwarePropSchema(VectorVariableSchema):
@@ -865,6 +727,7 @@ class IceAwareCurrent(GridCurrent):
         cctn = (self.ice_concentration.at(points, time,
                                             extrapolate=extrapolate, **kwargs)
                   .copy())
+        assert len(cctn.shape) == 2
 
         water_v = super(IceAwareCurrent, self).at(points,
                                                   time,
@@ -883,9 +746,10 @@ class IceAwareCurrent(GridCurrent):
 
             vels = water_v.copy()
             ice_v = self.ice_velocity.at(points, time, extrapolate=extrapolate, *args, **kwargs).copy()
+            assert len(vels.shape) == 2
 
             #deals with the >0.8 concentration case
-            vels[:] = vels[:] + (ice_v - water_v) * ice_vel_factor[:,None]
+            vels[:] = vels[:] + (ice_v - water_v) * ice_vel_factor
 
             return vels
         else:
@@ -929,6 +793,7 @@ class IceAwareWind(GridWind):
 
         cctn = self.ice_concentration.at(points, time, extrapolate=extrapolate, *args, **kwargs)
         wind_v = super(IceAwareWind, self).at(points, time, *args, **kwargs)
+        assert len(cctn.shape) == 2
 
         if np.any(cctn >= 0.2):
             ice_mask = cctn >= 0.8
@@ -941,11 +806,12 @@ class IceAwareWind(GridWind):
             ice_vel_factor[interp_mask] = ((ice_vel_factor[interp_mask] - 0.2) * 10) / 6
 
             vels = wind_v.copy()
-            vels[ice_mask] = 0
+            vels[ice_mask.reshape(-1)] = 0
+            #vels[vels_mask] = 0
 
             # scale winds from 100-0% depending on ice coverage
             # 100% wind up to 0.2 coverage, 0% wind at >0.8 coverage
-            vels[:] = vels[:] * (1 - ice_vel_factor[:,None])
+            vels[:] = vels[:] * (1 - ice_vel_factor)
 
             return vels
         else:

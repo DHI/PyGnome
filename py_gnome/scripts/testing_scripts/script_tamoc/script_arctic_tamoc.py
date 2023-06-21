@@ -19,11 +19,9 @@ But it's enough to see if the coupling with TAMOC works.
 
 import os
 import numpy as np
-#from pysgrid import SGrid
 from datetime import datetime, timedelta
 
 from gnome import scripting
-#from gnome.spills.elements import plume
 from gnome.utilities.distributions import WeibullDistribution
 from gnome.environment.gridded_objects_base import Variable, Grid_S
 from gnome.environment import IceAwareCurrent, IceConcentration, IceVelocity
@@ -35,8 +33,8 @@ from gnome.movers import (RandomMover,
                           RandomMover3D,
                           SimpleMover,
                           c_GridCurrentMover,
-                          PyCurrentMover,
-                          constant_wind_mover,
+                          CurrentMover,
+                          constant_point_wind_mover,
                           IceMover)
 
 from gnome.outputters import Renderer
@@ -46,6 +44,7 @@ from gnome.environment.environment_objects import IceAwareCurrent
 
 # define base directory
 base_dir = os.path.dirname(__file__)
+
 
 def make_model(images_dir=os.path.join(base_dir, 'images')):
     print('initializing the model')
@@ -99,9 +98,9 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     ivel = IceVelocity.from_netCDF(filename=fn_ice, grid = iconc.grid)
     ic = IceAwareCurrent.from_netCDF(ice_concentration = iconc, ice_velocity= ivel, filename=fn)
 
-    model.movers += PyCurrentMover(current = ic)
+    model.movers += CurrentMover(current = ic)
     model.movers += SimpleMover(velocity=(0., 0., 0.))
-    model.movers += constant_wind_mover(20, 315, units='knots')
+    model.movers += constant_point_wind_mover(20, 315, units='knots')
 
     # Now to add in the TAMOC "spill"
     print("Adding TAMOC spill")

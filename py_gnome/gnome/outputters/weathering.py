@@ -66,7 +66,8 @@ class WeatheringOutput(BaseMassBalanceOutputter):
                  output_dir=None,   # default is to not output to file
                  **kwargs):
         '''
-        :param str output_dir='./': output directory for the json files
+        :param str output_dir=None: output directory for the json files.
+                If not directory is provided, files will not be written.
 
         other arguments as defined in the Outputter class
         '''
@@ -101,8 +102,8 @@ class WeatheringOutput(BaseMassBalanceOutputter):
         filename = os.path.join(self.output_dir,
                                 file_format.format(step_num))
 
-        with open(filename, 'w') as outfile:
-            dump(json_content, outfile, indent=True)
+        with open(filename, 'w', encoding='utf-8') as outfile:
+            dump(json_content, outfile, indent=4)
 
         return filename
 

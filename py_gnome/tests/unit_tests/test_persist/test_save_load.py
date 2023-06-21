@@ -18,16 +18,18 @@ from gnome.environment import (Wind,
                                constant_wind,
                                GridCurrent)
 
-from gnome.movers import (constant_wind_mover,
+from gnome.movers import (constant_point_wind_mover,
                           SimpleMover,
                           RandomMover,
                           RandomMover3D,
-                          WindMover,
+                          PointWindMover,
                           CatsMover,
                           ComponentMover,
                           CurrentCycleMover,
                           c_GridCurrentMover,
-                          GridWindMover)
+                          WindMover,
+                          CurrentMover,
+                          c_GridWindMover)
 
 from gnome.weatherers import (Evaporation,
                               Skimmer,
@@ -51,11 +53,11 @@ from gnome.spills.gnome_oil import GnomeOil
 # following is modified for testing only
 from gnome.persist import save_load
 
-from .conftest import testdata
+from ..conftest import testdata
 
 import pytest
 from testfixtures import LogCapture
-from .conftest import test_oil
+from ..conftest import test_oil
 
 
 def test_warning_logged():
@@ -76,8 +78,8 @@ def test_class_from_objtype():
     '''
     test that correct class is returned by class_from_objtype
     '''
-    cls = class_from_objtype('gnome.movers.WindMover')
-    assert cls is WindMover
+    cls = class_from_objtype('gnome.movers.PointWindMover')
+    assert cls is PointWindMover
 
 
 def test_exceptions():
@@ -116,7 +118,7 @@ def test_gnome_obj_reference():
     create two equal but different objects and make sure a new reference is
     created for each
     '''
-    objs = [constant_wind_mover(0, 0) for _i in range(2)]
+    objs = [constant_point_wind_mover(0, 0) for _i in range(2)]
     assert objs[0] is not objs[1]
 
     refs = References()
@@ -128,7 +130,7 @@ def test_gnome_obj_reference():
         assert refs.retrieve(ref) is objs[ix]
         assert objs[ix] in refs   # double check __contains__
 
-    unknown = constant_wind_mover(0, 0)
+    unknown = constant_point_wind_mover(0, 0)
     assert unknown not in refs  # check __contains__
 
 
@@ -141,7 +143,7 @@ here and parametrize it by the objects
 base_dir = os.path.dirname(__file__)
 
 
-# For WindMover test_save_load in test_wind_mover
+# For PointWindMover test_save_load in test_wind_mover
 g_objects = (
     GridCurrent.from_netCDF(testdata['c_GridCurrentMover']['curr_tri']),
     Tide(testdata['CatsMover']['tide']),
@@ -159,6 +161,10 @@ g_objects = (
     ComponentMover(testdata['ComponentMover']['curr'],
                    wind=constant_wind(5., 270, 'knots')),
                    # wind=Wind(filename=testdata['ComponentMover']['wind'])),
+     WindMover(testdata['c_GridWindMover']['wind_rect']),
+     #WindMover(testdata['c_GridWindMover']['wind_curv']), #variable names wrong
+     CurrentMover(testdata['c_GridCurrentMover']['curr_tri']),
+     CurrentMover(testdata['c_GridCurrentMover']['curr_reg']),
     RandomMover3D(),
     SimpleMover(velocity=(10.0, 10.0, 0.0)),
 
@@ -181,8 +187,8 @@ g_objects = (
     # todo: ask Caitlin how to fix
     # movers.RiseVelocityMover(),
     # todo: This is incomplete - no _schema for
-    #       SpatialRelease, GeoJson
-    # spill.SpatialRelease(datetime.now(), ((0, 0, 0), (1, 2, 0))),
+    #       PolygonRelease, GeoJson
+    # spill.PolygonRelease(datetime.now(), ((0, 0, 0), (1, 2, 0))),
     TrajectoryGeoJsonOutput(),
 )
 
@@ -255,8 +261,8 @@ l_movers2 = (CurrentCycleMover(testdata['CurrentCycleMover']['curr'],
                                topology_file=testdata['CurrentCycleMover']['top']),
              c_GridCurrentMover(testdata['c_GridCurrentMover']['curr_tri'],
                               testdata['c_GridCurrentMover']['top_tri']),
-             GridWindMover(testdata['GridWindMover']['wind_curv'],
-                           testdata['GridWindMover']['top_curv']),
+             c_GridWindMover(testdata['c_GridWindMover']['wind_curv'],
+                           testdata['c_GridWindMover']['top_curv']),
              )
 
 
