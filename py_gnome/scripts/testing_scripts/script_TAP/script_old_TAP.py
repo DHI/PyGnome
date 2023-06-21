@@ -19,11 +19,11 @@ from gnome.model import Model
 from gnome.maps import MapFromBNA, GnomeMap
 from gnome.environment import Wind
 from gnome.spills import surface_point_line_spill
-from gnome.movers import RandomMover, constant_wind_mover, c_GridCurrentMover
+from gnome.movers import RandomMover, constant_point_wind_mover, c_GridCurrentMover
 
-from gnome.movers.py_wind_movers import PyWindMover
+from gnome.movers.py_wind_movers import WindMover
 #from gnome.environment.property_classes import WindTS, IceAwareCurrent, IceAwareWind
-from gnome.movers.py_current_movers import PyCurrentMover
+from gnome.movers.py_current_movers import CurrentMover
 
 from gnome.outputters import Renderer, NetCDFOutput
 #from gnome.environment.vector_field import ice_field
@@ -92,8 +92,8 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     print(wind_file)
     topology_file = os.path.join(base_dir, 'arctic_subset_newtopo2.DAT')
     model.movers += IceWindMover(wind_file, topology_file)
-    # model.movers += GridWindMover(wind_file, topology_file)
-    # model.movers += GridWindMover(wind_file, topology_file)
+    # model.movers += c_GridWindMover(wind_file, topology_file)
+    # model.movers += c_GridWindMover(wind_file, topology_file)
 
     print('adding an ice mover:')
   # ice from the ROMS Arctic run, provided by Walter Johnson
@@ -118,10 +118,10 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
 #                                               grid = ice_aware_curr.grid,)
 #     method = 'RK2'
 #
-# #     i_c_mover = PyCurrentMover(current=ice_aware_curr)
-# #     i_c_mover = PyCurrentMover(current=ice_aware_curr, default_num_method='Euler')
-#     i_c_mover = PyCurrentMover(current=ice_aware_curr, default_num_method=method)
-#     i_w_mover = PyWindMover(wind = ice_aware_wind, default_num_method=method)
+# #     i_c_mover = GridCurrentMover(current=ice_aware_curr)
+# #     i_c_mover = GridCurrentMover(current=ice_aware_curr, default_num_method='Euler')
+#     i_c_mover = GridCurrentMover(current=ice_aware_curr, default_num_method=method)
+#     i_w_mover = GridWindMover(wind = ice_aware_wind, default_num_method=method)
 #
 #     ice_aware_curr.grid.node_lon = ice_aware_curr.grid.node_lon[:]-360
 # #     ice_aware_curr.grid.build_celltree()

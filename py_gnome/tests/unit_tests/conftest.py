@@ -88,7 +88,7 @@ def validate_save_json(json_, zipfile_, orig_obj):
     save_refs = schema.get_nodes_by_attr('save_reference')
     for n in save_refs:
         if getattr(orig_obj, n) is not None:
-            if isinstance(getattr(orig_obj, n), collections.Iterable):
+            if isinstance(getattr(orig_obj, n), collections.abc.Iterable):
                 for i, ref in enumerate(getattr(orig_obj, n)):
                     assert json_[n][i] == ref.name + '.json'
                     assert json_[n][i] in zipfile_.namelist()
@@ -209,7 +209,8 @@ def sample_sc_release(num_elements=10,
                          arr_types=None,
                          windage_range=None,
                          units='g',
-                         amount_per_element=1.0):
+                         amount_per_element=1.0,
+                         environment = None):
     """
     Initialize a Spill of type 'spill', add it to a SpillContainer.
     Invoke release_elements on SpillContainer, then return the spill container
@@ -223,9 +224,9 @@ def sample_sc_release(num_elements=10,
 
     if spill is None:
         spill = gnome.spills.surface_point_line_spill(num_elements,
-                                                     start_pos,
-                                                     release_time,
-                                                     amount=0)
+                                                      start_pos,
+                                                      release_time,
+                                                      amount=0)
     spill.units = units
     spill.amount = amount_per_element * num_elements
 
@@ -248,7 +249,7 @@ def sample_sc_release(num_elements=10,
 
     # used for testing so just assume there is a Windage array
     sc.prepare_for_model_run(arr_types)
-    sc.release_elements(time_step, current_time)
+    sc.release_elements(current_time, current_time + timedelta(seconds=time_step), environment)
 
     return sc
 
@@ -326,7 +327,7 @@ def get_testdata():
     get_datafile(os.path.join(curr_dir, 'gridcur_tsA.cur'))
     get_datafile(os.path.join(curr_dir, 'gridcur_tsB.cur'))
 
-    data['GridWindMover'] = \
+    data['c_GridWindMover'] = \
         {'wind_curv': get_datafile(os.path.join(wind_dir,
                                                 'WindSpeedDirSubset.nc')),
          'top_curv': get_datafile(os.path.join(wind_dir,

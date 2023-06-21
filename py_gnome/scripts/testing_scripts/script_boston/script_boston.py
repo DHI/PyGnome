@@ -34,7 +34,7 @@ from gnome.utilities.projections import GeoProjection
 
 # from gnome.model import Model
 # from gnome.spills import surface_point_line_spill
-# from gnome.movers import RandomMover, WindMover, CatsMover, ComponentMover
+# from gnome.movers import RandomMover, PointWindMover, CatsMover, ComponentMover
 
 
 # from gnome.outputters import Renderer, NetCDFOutput, KMZOutput
@@ -92,11 +92,11 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     # series[1] = (start_time + timedelta(hours=25), (5, 180))
 
 
-    # w_mover = WindMover(Wind(timeseries=series, units='m/s'))
+    # w_mover = PointWindMover(Wind(timeseries=series, units='m/s'))
     # model.movers += w_mover
     # model.environment += w_mover.wind
 
-    w_mover = gs.constant_wind_mover(5, 180, units='m/s')
+    w_mover = gs.constant_point_wind_mover(5, 180, units='m/s')
     model.movers += w_mover
     print('adding a cats shio mover:')
 

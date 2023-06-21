@@ -2,9 +2,6 @@
 test manual_beaching
 '''
 
-
-
-
 from datetime import datetime, timedelta
 import pytest
 import numpy as np
@@ -45,7 +42,7 @@ def test_init(timeseries, units):
 
 
 class TestBeaching(ObjForTests):
-    (sc, weatherers) = ObjForTests.mk_test_objs()
+    (sc, weatherers, environment) = ObjForTests.mk_test_objs()
     sc.spills[0].release_time = active_range[0]
 
     b = Beaching(active_range, 'l', timeseries, name='test_beaching',
@@ -96,12 +93,16 @@ class TestBeaching(ObjForTests):
         self.prepare_test_objs()
         self.b.prepare_for_model_run(self.sc)
 
+        print(f"{self.b.water}")
+        from gnome.environment import  Water
+        self.b.water = Water()
+
         assert self.sc.mass_balance['observed_beached'] == 0.0
 
         while (model_time < self.b.active_range[1] + timedelta(seconds=time_step)):
             amt = self.sc.mass_balance['observed_beached']
 
-            self.release_elements(time_step, model_time)
+            self.release_elements(time_step, model_time, self.environment)
             self.step(self.b, time_step, model_time)
 
             if not self.b.active:

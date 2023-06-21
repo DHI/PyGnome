@@ -9,17 +9,17 @@ from functools import wraps
 
 from colander import (SchemaNode, SequenceSchema,
                       String, Boolean, DateTime,
-                      drop)
+                      drop, Int)
 
 import gridded
 from gridded.utilities import get_dataset
-import unit_conversion as uc
+import nucos as uc
 
 from gnome.gnomeobject import combine_signatures
 from gnome.persist import base_schema
 from gnome.gnomeobject import GnomeId
-from gnome.persist.extend_colander import FilenameSchema
-from gnome.persist.base_schema import GeneralGnomeObjectSchema
+from gnome.persist import (GeneralGnomeObjectSchema, SchemaNode, SequenceSchema,
+                           String, Boolean, DateTime, drop, FilenameSchema)
 from gnome.persist.validators import convertible_to_seconds
 from gnome.persist.extend_colander import LocalDateTime
 from gnome.utilities.inf_datetime import InfDateTime
@@ -46,7 +46,7 @@ class TimeSchema(base_schema.ObjTypeSchema):
 
 
 class GridSchema(base_schema.ObjTypeSchema):
-    name = SchemaNode(String(), test_equal=False) #remove this once gridded stops using _def_count
+    name = SchemaNode(String(), test_equal=False)
     filename = FilenameSchema(
         isdatafile=True, test_equal=False, update=False
     )
@@ -55,6 +55,10 @@ class DepthSchema(base_schema.ObjTypeSchema):
     filename = FilenameSchema(
         isdatafile=True, test_equal=False, update=False
     )
+
+class S_DepthSchema(DepthSchema):
+    vtransform = SchemaNode(Int())
+    zero_ref = SchemaNode(String())
 
 
 class VariableSchemaBase(base_schema.ObjTypeSchema):
@@ -632,6 +636,19 @@ class Variable(gridded.Variable, GnomeId):
 
         return super(Variable, cls).new_from_dict(dict_)
 
+    @classmethod
+    def constant(cls, value):
+        #Sets a Variable up to represent a constant scalar field. The result
+        #will return a constant value for all times and places.
+        Grid = Grid_S
+        Time = cls._default_component_types['time']
+        _data = np.full((3,3), value)
+        _node_lon = np.array(([-360, 0, 360], [-360, 0, 360], [-360, 0, 360]))
+        _node_lat = np.array(([-89.95, -89.95, -89.95], [0, 0, 0], [89.95, 89.95, 89.95]))
+        _grid = Grid(node_lon=_node_lon, node_lat=_node_lat)
+        _time = Time.constant_time()
+        return cls(grid=_grid, time=_time, data=_data)
+
     @property
     def extrapolation_is_allowed(self):
         if self.time is not None:
@@ -690,13 +707,18 @@ class L_Depth(gridded.depth.L_Depth, GnomeId):
 
 class S_Depth(gridded.depth.S_Depth, GnomeId):
 
-    _schema = DepthSchema
+    _schema = S_DepthSchema
 
     _default_component_types = copy.deepcopy(gridded.depth.S_Depth
                                              ._default_component_types)
     _default_component_types.update({'time': Time,
                                      'grid': PyGrid,
                                      'variable': Variable})
+
+    def __init__(self,
+                 zero_ref = 'surface',
+                 **kwargs):
+        return super(S_Depth, self).__init__(zero_ref=zero_ref, **kwargs)
 
     @classmethod
     def new_from_dict(cls, dict_):

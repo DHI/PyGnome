@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 """
-Script to test GNOME with chesapeake bay data (netCDF 3D triangle grid)
+Script to test GNOME with Chesapeake bay data (netCDF 3D triangle grid)
 Eventually update to use Grid Map rather than BNA
+
+NOTE: This is using the "old" C++ code, wrapped by c_GridCurrentMover
+      The Chesapeake Bay OFS uses and old grid that's not compatible with
+      the newer codebase. In most cases, you will want to use GridCurrentMover
 """
 
 import os
@@ -82,7 +86,7 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     wind = gs.Wind(timeseries=series, units='knot')
 
     # default is .4 radians
-    w_mover = gs.WindMover(wind, uncertain_angle_scale=0)
+    w_mover = gs.PointWindMover(wind, uncertain_angle_scale=0)
     wind.extrapolation_is_allowed = True
     model.movers += w_mover
 
