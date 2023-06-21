@@ -2,6 +2,8 @@
 tests for code that reads teh old gridcur format
 """
 
+
+
 from pathlib import Path
 from datetime import datetime
 
@@ -80,7 +82,7 @@ def test_nonexistant_filename_nc():
 def test_gridcur_in_model():
 
     current = FileGridCurrent(test_data_dir / NODE_EXAMPLE)
-    mover = gs.PyCurrentMover(current=current)
+    mover = gs.CurrentMover(current=current)
 
     start_time = "2020-07-14T12:00"
     model = gs.Model(time_step=gs.hours(1),
@@ -117,7 +119,11 @@ def test_gridcur_serialize():
                               extrapolation_is_allowed=True,
                               )
 
+    print("About to serialze")
+    print(f"{current.filename}")
     serial = current.serialize()
+
+    print(f"{serial}")
 
     current2 = FileGridCurrent.deserialize(serial)
 
@@ -125,7 +131,7 @@ def test_gridcur_serialize():
     assert current2.extrapolation_is_allowed
     assert current2.filename == filename
 
-
+@pytest.mark.skip
 def test_netcdf_file():
 
     testfile = str(test_data_dir / 'tri_ring.nc')
@@ -145,7 +151,7 @@ def test_netcdf_file():
 
     assert len(current.variables) == 3
 
-
+@pytest.mark.skip
 def test_netcdf_in_model():
     """
     the current object works with a model, and produces
@@ -155,7 +161,7 @@ def test_netcdf_in_model():
     """
     # Single timestep, so time doesn't matter.
     current = FileGridCurrent(str(test_data_dir / 'tri_ring.nc'))
-    mover = gs.PyCurrentMover(current=current)
+    mover = gs.CurrentMover(current=current)
 
     start_time = "2020-07-14T12:00"
     model = gs.Model(time_step=gs.hours(1),

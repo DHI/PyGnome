@@ -4,7 +4,7 @@ curvilinear gridded data
 
 This script uses:
 - GridCurrent
-- PyCurrentMover
+- GridCurrentMover
 - rendering of GridCurrent using Renderer
 """
 
@@ -66,7 +66,7 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     # - will need diffusion and rise velocity
     # - wind doesn't act
     # - start_position = (-76.126872, 37.680952, 5.0),
-    spill1 = gs.point_line_release_spill(num_elements=1000,
+    spill1 = gs.surface_point_line_spill(num_elements=1000,
                                       start_position=(-74.15,
                                                       40.5,
                                                       0.0),
@@ -79,7 +79,7 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
 
     print('adding a wind mover:')
 
-    model.movers += gs.constant_wind_mover(4, 270, units='m/s')
+    model.movers += gs.constant_point_wind_mover(4, 270, units='m/s')
 
     print('adding a current mover:')
 
@@ -89,7 +89,7 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
 #     cf = GridCurrent.from_netCDF(url)
 #     renderer.add_grid(cf.grid)
 #     renderer.delay = 25
-#     u_mover = PyCurrentMover(cf, default_num_method='Euler')
+#     u_mover = GridCurrentMover(cf, default_num_method='Euler')
 #     model.movers += u_mover
 #
 

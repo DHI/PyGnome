@@ -18,12 +18,12 @@ from gnome.model import Model
 
 from gnome.maps import MapFromBNA, GnomeMap
 from gnome.environment import Wind
-from gnome.spill import point_line_release_spill
-from gnome.movers import RandomMover, constant_wind_mover, GridCurrentMover
+from gnome.spills import surface_point_line_spill
+from gnome.movers import RandomMover, constant_point_wind_mover, c_GridCurrentMover
 
-from gnome.movers.py_wind_movers import PyWindMover
+from gnome.movers.py_wind_movers import WindMover
 #from gnome.environment.property_classes import WindTS, IceAwareCurrent, IceAwareWind
-from gnome.movers.py_current_movers import PyCurrentMover
+from gnome.movers.py_current_movers import CurrentMover
 
 from gnome.outputters import Renderer, NetCDFOutput
 #from gnome.environment.vector_field import ice_field
@@ -68,13 +68,13 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     # - will need diffusion and rise velocity
     # - wind doesn't act
     # - start_position = (-76.126872, 37.680952, 5.0),
-    spill1 = point_line_release_spill(num_elements=10000,
+    spill1 = surface_point_line_spill(num_elements=10000,
                                       start_position=(196.25,
                                                       69.75,
                                                       0.0),
                                       release_time=start_time)
 #
-#     spill2 = point_line_release_spill(num_elements=5000,
+#     spill2 = surface_point_line_spill(num_elements=5000,
 #                                       start_position=(-163.75,
 #                                                       69.5,
 #                                                       0.0),
@@ -92,8 +92,8 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     print(wind_file)
     topology_file = os.path.join(base_dir, 'arctic_subset_newtopo2.DAT')
     model.movers += IceWindMover(wind_file, topology_file)
-    # model.movers += GridWindMover(wind_file, topology_file)
-    # model.movers += GridWindMover(wind_file, topology_file)
+    # model.movers += c_GridWindMover(wind_file, topology_file)
+    # model.movers += c_GridWindMover(wind_file, topology_file)
 
     print('adding an ice mover:')
   # ice from the ROMS Arctic run, provided by Walter Johnson
@@ -118,10 +118,10 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
 #                                               grid = ice_aware_curr.grid,)
 #     method = 'RK2'
 #
-# #     i_c_mover = PyCurrentMover(current=ice_aware_curr)
-# #     i_c_mover = PyCurrentMover(current=ice_aware_curr, default_num_method='Euler')
-#     i_c_mover = PyCurrentMover(current=ice_aware_curr, default_num_method=method)
-#     i_w_mover = PyWindMover(wind = ice_aware_wind, default_num_method=method)
+# #     i_c_mover = GridCurrentMover(current=ice_aware_curr)
+# #     i_c_mover = GridCurrentMover(current=ice_aware_curr, default_num_method='Euler')
+#     i_c_mover = GridCurrentMover(current=ice_aware_curr, default_num_method=method)
+#     i_w_mover = GridWindMover(wind = ice_aware_wind, default_num_method=method)
 #
 #     ice_aware_curr.grid.node_lon = ice_aware_curr.grid.node_lon[:]-360
 # #     ice_aware_curr.grid.build_celltree()
@@ -133,7 +133,7 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
 
 #     renderer.set_viewport(((-190.9, 60), (-72, 89)))
     # curr_file = get_datafile(os.path.join(base_dir, 'COOPSu_CREOFS24.nc'))
-    # c_mover = GridCurrentMover(curr_file)
+    # c_mover = c_GridCurrentMover(curr_file)
     # model.movers += c_mover
     model.save('.')
     return model

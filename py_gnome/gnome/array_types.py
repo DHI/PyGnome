@@ -6,7 +6,7 @@ movers needs
 ** NOTE: **
     These are global declarations
 
-    For instance: If the WindMover that uses array_types.WindMover updates
+    For instance: If the PointWindMover that uses array_types.PointWindMover updates
     the properties of 'windages' ArrayType, it will change it universally.
 
     The user/mover should not need to change dtype or shape internally. If
@@ -255,6 +255,9 @@ _default_values = {'positions': ((3,), world_point_type, 'positions',
                    # bulk_init_volume initial volume of blob of oil - the sum
                    # of all LEs released together is the volume of the blob.
                    # It is evenly divided to number of LEs
+                   'vol_frac_le_st': ((), np.float64, 'vol_frac_le_st', 0),
+                   'max_area_le': ((), np.float64, 'max_area_le', 0),
+                   'release_rate': ((), np.float64, 'release_rate', np.nan),
                    'bulk_init_volume': ((), np.float64, 'bulk_init_volume', 0,
                                         ArrayTypeDivideOnSplit),
                    'density': ((), np.float64, 'density', 1000),
@@ -363,17 +366,27 @@ def reset_to_defaults(at):
             pass
 
 # The array types that will always be used in the model.
-default_array_types = {'positions': gat('positions'),
-                       'next_positions': gat('next_positions'),
-                       'last_water_positions': gat('last_water_positions'),
-                       'status_codes': gat('status_codes'),
-                       'mass': gat('mass'),
-                       'init_mass': gat('init_mass'),
-                       'age': gat('age'),
-                       'density': gat('density'),
-                       'viscosity': gat('viscosity'),
-                       'surface_concentration': gat('surface_concentration'),
-                       'spill_num': gat('spill_num'),
-                       'id': gat('id')
-                       }
 
+# fixme: why are viscosity and surface_concentration here? even density?
+DEFAULT_ARRAY_TYPES = ['positions',
+                       'next_positions',
+                       'last_water_positions',
+                       'status_codes',
+                       'mass',
+                       'init_mass',
+                       'age',
+                       'density',
+                       'viscosity',
+                       'surface_concentration',
+                       'spill_num',
+                       'id',
+                       'vol_frac_le_st',
+                       'max_area_le',
+                       'release_rate',
+                       'bulk_init_volume',
+                       'area',
+                       'fay_area',
+                       'frac_coverage',
+                       ]
+
+default_array_types = {at: gat(at) for at in DEFAULT_ARRAY_TYPES}

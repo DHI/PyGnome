@@ -1,5 +1,38 @@
 #!/usr/bin/env python
 
+"""
+module with the core Model class, and various supporting classes
+
+This is the main class that contains objects used to model trajectory and
+weathering processes. It runs the loop through time, etc.
+The code comes with a full-featured version -- you may want a simpler one if
+you aren't doing a full-on oil spill model. The model contains:
+
+* map
+* collection of environment objects
+* collection of movers
+* collection of weatherers
+* spills
+* its own attributes
+
+In pseudo code, the model loop is defined below. In the first step, it sets up the
+model run and in subsequent steps the model moves and weathers elements.
+
+.. code-block:: python
+
+    for each_timestep():
+        if initial_timestep:
+            setup_model_run()
+        setup_time_step()
+        move_the_elements()
+        beach_refloat_the_elements()
+        weather_the_elements()
+        write_output()
+        step_is_done()
+        step_num += 1
+
+"""
+
 import os
 from datetime import datetime, timedelta
 import zipfile
@@ -7,7 +40,6 @@ from pprint import pformat
 import copy
 
 import numpy as np
-
 
 from colander import (SchemaNode,
                       String, Float, Int, Bool, List,
@@ -27,13 +59,13 @@ from gnome.maps.map import (GnomeMapSchema,
                             GnomeMap)
 
 from gnome.environment import Environment, Wind
+from gnome.environment.water import Water
 from gnome.array_types import gat
 from gnome.environment import schemas as env_schemas
 
 from gnome.movers import Mover, mover_schemas
 from gnome.weatherers import (weatherer_sort,
                               Weatherer,
-                              WeatheringData,
                               FayGravityViscous,
                               Langmuir,
                               weatherer_schemas,
@@ -49,10 +81,14 @@ from gnome.persist.base_schema import (ObjTypeSchema,
                                        CollectionItemsList,
                                        GeneralGnomeObjectSchema)
 from gnome.exceptions import ReferencedObjectNotSet, GnomeRuntimeError
-from gnome.spill.spill import SpillSchema
+from gnome.spills.spill import SpillSchema
 from gnome.gnomeobject import GnomeId, allowzip64, Refs
 from gnome.persist.extend_colander import OrderedCollectionSchema
-from gnome.spill.substance import NonWeatheringSubstance
+from gnome.spills.substance import NonWeatheringSubstance
+
+from gnome.ops import aggregated_data, weathering_array_types, non_weathering_array_types
+from gnome.ops.viscosity import recalc_viscosity
+from gnome.ops.density import recalc_density
 
 
 class ModelSchema(ObjTypeSchema):
@@ -179,8 +215,8 @@ class Model(GnomeId):
 
         :param time_step=timedelta(minutes=15): model time step in seconds
                                                 or as a timedelta object. NOTE:
-                                                if you pass in a number,
-                                                it WILL be seconds
+                                                if you pass in a number, it WILL
+                                                be interpreted as seconds
 
         :param start_time=datetime.now(): start time of model, datetime
                                           object. Rounded to the nearest hour.
@@ -288,7 +324,7 @@ class Model(GnomeId):
 
         :param which='standard': which weatheres to add. Default is 'standard',
                                  which will add all the standard weathering algorithms
-                                 if you don't want them all, you can speicfy a list:
+                                 if you don't want them all, you can specify a list:
                                  ['evaporation', 'dispersion'].
 
                                  Options are:
@@ -721,16 +757,13 @@ class Model(GnomeId):
 
         '''Step 1: Set up special objects'''
         weather_data = dict()
-        wd = None
+
         spread = None
         langmuir = None
         for item in self.weatherers:
             if item.on:
                 weather_data.update(item.array_types)
 
-            if isinstance(item, WeatheringData):
-                item.on = False
-                wd = item
             try:
                 if item._ref_as == 'spreading':
                     item.on = False
@@ -741,17 +774,7 @@ class Model(GnomeId):
             except AttributeError:
                 pass
 
-        # if WeatheringData object and FayGravityViscous (spreading object)
-        # are not defined by user, add them automatically because most
-        # weatherers will need these
-        if len(weather_data) > 0:
-            if wd is None:
-                self.weatherers += WeatheringData()
-            else:
-                # turn WD back on
-                wd.on = True
-
-        # if a weatherer is using 'area' array, make sure it is being set.
+# if a weatherer is using 'area' array, make sure it is being set.
         # Objects that set 'area' are referenced as 'spreading'
         if 'area' in weather_data:
             if spread is None:
@@ -774,6 +797,12 @@ class Model(GnomeId):
 
         '''Step 3: Compile array_types and run setup on spills'''
         array_types = dict()
+        #setup basic array types. non_weathering is subset of weathering
+        array_types.update(non_weathering_array_types)
+        for sp in self.spills:
+            if sp.substance and sp.substance.is_weatherable:
+                array_types.update(weathering_array_types)
+        #Go through all subcomponents to see what array types they need
         for oc in [self.movers,
                    self.outputters,
                    self.environment,
@@ -792,7 +821,13 @@ class Model(GnomeId):
         ref_dict = {}
         self._attach_default_refs(ref_dict)
 
-        '''Step 5 & 6: Call prepare_for_model_run and misc setup'''
+        '''Step 5: Setup mass balance'''
+        for sc in self.spills.items():
+            for key in ('avg_density', 'floating', 'amount_released', 'non_weathering',
+                        'avg_viscosity'):
+                sc.mass_balance[key] = 0.0
+
+        '''Step 6: Call prepare_for_model_run and misc setup'''
         transport = False
         for mover in self.movers:
             if mover.on:
@@ -1002,6 +1037,14 @@ class Model(GnomeId):
 
         Output data
         '''
+
+        #run ops and aggregation step for mass_balance
+        env = self.compile_env()
+        for sc in self.spills.items():
+            recalc_density(sc, env['water'])
+            recalc_viscosity(sc, env['water'])
+            aggregated_data.aggregate(sc)
+
         for mover in self.movers:
             for sc in self.spills.items():
                 mover.model_step_is_done(sc)
@@ -1042,8 +1085,10 @@ class Model(GnomeId):
 
     def step(self):
         '''
-        Steps the model forward (or backward) in time. Needs testing for
-        hindcasting.
+        Steps the model forward in time.
+
+        NOTE: in theory, it could also go backward with a negative time step,
+        for hindcasting, but that has not been tested.
         '''
         isValid = True
         for sc in self.spills.items():
@@ -1065,8 +1110,11 @@ class Model(GnomeId):
 
             # going into step 0
             self.current_time_step += 1
-            # only release 1 second, to catch any instantaneous releases
-            self.release_elements(0, self.model_time)
+            model_time = self.model_time
+            for sc in self.spills.items():
+                sc.current_time_stamp = model_time
+            # this will only release an instantaneous release
+            self.release_elements(model_time, model_time)
             # step 0 output
             output_info = self.output_step(isValid)
 
@@ -1082,14 +1130,20 @@ class Model(GnomeId):
 
         else:
             # release half the LEs for this time interval
-            self.release_elements(self.time_step / 2, self.model_time)
+            half_step = timedelta(seconds=self.time_step / 2)
+            self.release_elements(self.model_time,
+                                  self.model_time + half_step)
             self.setup_time_step()
             self.move_elements()
             self.weather_elements()
             self.step_is_done()
             self.current_time_step += 1
+            for sc in self.spills.items():
+                # could this be set in the current_time_step setter?
+                sc.current_time_stamp = self.model_time
             # Release the remaining half of the LEs in this time interval
-            self.release_elements(0, self.model_time)
+            self.release_elements(self.model_time - half_step,
+                                  self.model_time)
             output_info = self.output_step(isValid)
             return output_info
 
@@ -1102,14 +1156,19 @@ class Model(GnomeId):
                           .format(self))
         return output_info
 
-    def release_elements(self, time_step, model_time):
-        num_released = 0
-        for sc in self.spills.items():
-            sc.current_time_stamp = model_time
-            # release particles for next step - these particles will be aged
-            # in the next step
-            num_released = sc.release_elements(time_step, model_time)
+    def release_elements(self, start_time, end_time):
+        """
+        release elements into the model
 
+        :param start_time: -- beginning of the release
+        :param end_time: -- end of the release.
+        """
+
+        num_released = 0
+        env = self.compile_env()
+        for sc in self.spills.items():
+            # release particles
+            num_released = sc.release_elements(start_time, end_time, environment=env)
             # initialize data - currently only weatherers do this so cycle
             # over weatherers collection - in future, maybe movers can also do
             # this
@@ -1118,10 +1177,27 @@ class Model(GnomeId):
                     if item.on:
                         item.initialize_data(sc, num_released)
 
+            aggregated_data.aggregate(sc, num_released)
+
             self.logger.debug("{1._pid} released {0} new elements for step:"
                               " {1.current_time_step} for {1.name}".
                               format(num_released, self))
         return num_released
+
+    def compile_env(self):
+        '''
+        Produces a dictionary of objects that describe the model environmental conditions
+
+        Currently, only works with the 'water' object because the other environmental phenomena
+        are not compatible yet
+        '''
+        env = {}
+        water = self.find_by_attr('_ref_as', 'water', self.environment)
+        if water:
+            env['water'] = water
+        else:
+            env['water'] = None
+        return env
 
     def __iter__(self):
         '''
@@ -1156,7 +1232,7 @@ class Model(GnomeId):
         if rewind:
             self.rewind()
 
-        self.setup_model_run()
+#        self.setup_model_run()
         # run the model
         output_data = []
         while True:
@@ -1585,13 +1661,20 @@ class Model(GnomeId):
             msgs.append('warning: ' + self.__class__.__name__ + ': ' + msg)
             # isValid = False
 
+        # check if movers and map overlap
+        # this is mostly to catch different coordinate systems:
+        #   -180--180 vs 0--360
         map_bounding_box = self.map.get_map_bounding_box()
         for mover in self.movers:
+            if not mover.on:
+                continue
             bounds = mover.get_bounds()
             # check longitude is within map bounds
+            # note: there is a BoundingBox class in utilities.geometry with an "overlaps" method.
             if (bounds[1][0] < map_bounding_box[0][0] or bounds[0][0] > map_bounding_box[1][0] or
                 bounds[1][1] < map_bounding_box[0][1] or bounds[0][1] > map_bounding_box[1][1]):
-                msg = ('One of the movers - {0} - is outside of the map bounds. '
+                msg = ('One of the movers - {0} - does not overlap with the map bounds. '
+                       'Check that they are in the same longitude coordinate system'
                         .format(mover.name))
                 self.logger.warning(msg)  # for now make this a warning
                 msgs.append('warning: ' + self.__class__.__name__ + ': ' + msg)

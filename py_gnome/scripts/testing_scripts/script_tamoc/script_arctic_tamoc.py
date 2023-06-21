@@ -19,26 +19,22 @@ But it's enough to see if the coupling with TAMOC works.
 
 import os
 import numpy as np
-from pysgrid import SGrid
 from datetime import datetime, timedelta
 
 from gnome import scripting
-from gnome.spill.elements import plume
 from gnome.utilities.distributions import WeibullDistribution
 from gnome.environment.gridded_objects_base import Variable, Grid_S
 from gnome.environment import IceAwareCurrent, IceConcentration, IceVelocity
 
 from gnome.model import Model
-from gnome.map import GnomeMap
-from gnome.spill import point_line_release_spill
-from gnome.scripting import subsurface_plume_spill
+from gnome.maps.map import GnomeMap
 from gnome.movers import (RandomMover,
                           TamocRiseVelocityMover,
                           RandomMover3D,
                           SimpleMover,
-                          GridCurrentMover,
-                          PyCurrentMover,
-                          constant_wind_mover,
+                          c_GridCurrentMover,
+                          CurrentMover,
+                          constant_point_wind_mover,
                           IceMover)
 
 from gnome.outputters import Renderer
@@ -48,6 +44,7 @@ from gnome.environment.environment_objects import IceAwareCurrent
 
 # define base directory
 base_dir = os.path.dirname(__file__)
+
 
 def make_model(images_dir=os.path.join(base_dir, 'images')):
     print('initializing the model')
@@ -101,9 +98,9 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     ivel = IceVelocity.from_netCDF(filename=fn_ice, grid = iconc.grid)
     ic = IceAwareCurrent.from_netCDF(ice_concentration = iconc, ice_velocity= ivel, filename=fn)
 
-    model.movers += PyCurrentMover(current = ic)
+    model.movers += CurrentMover(current = ic)
     model.movers += SimpleMover(velocity=(0., 0., 0.))
-    model.movers += constant_wind_mover(20, 315, units='knots')
+    model.movers += constant_point_wind_mover(20, 315, units='knots')
 
     # Now to add in the TAMOC "spill"
     print("Adding TAMOC spill")
@@ -111,12 +108,13 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     model.spills += tamoc_spill.TamocSpill(release_time=start_time,
                                         start_position=(196.16, 71.91, 40.0),
                                         num_elements=1000,
-                                        end_release_time=start_time + timedelta(days=1),
+                                        #end_release_time=start_time + timedelta(days=1),
+                                        release_duration=timedelta(days=1),
                                         name='TAMOC plume',
-                                        TAMOC_interval=None,  # how often to re-run TAMOC
+                                        #TAMOC_interval=None,  # how often to re-run TAMOC
                                         )
 
-    model.spills[0].data_sources['currents'] = ic
+    #model.spills[0].data_sources['currents'] = ic
 
     return model
 
@@ -124,8 +122,8 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
 if __name__ == "__main__":
     scripting.make_images_dir()
     model = make_model()
-    model.spills[0].update_environment_conditions(model.model_time)
-    model.spills[0].tamoc_parameters['depth'] = model.spills[0].start_position[2]
+    #model.spills[0].update_environment_conditions(model.model_time)
+    #model.spills[0].tamoc_parameters['depth'] = model.spills[0].start_position[2]
     print("about to start running the model")
     for step in model:
         if step['step_num'] == 0:

@@ -6,7 +6,6 @@ add these as weatherers
 from datetime import timedelta
 
 import numpy as np
-from colander import (SchemaNode, Float, String, drop, Range)
 
 from gnome.basic_types import oil_status, fate as bt_fate
 from gnome.array_types import gat
@@ -16,13 +15,16 @@ from gnome.environment.wind import WindSchema
 from .core import WeathererSchema
 from .. import _valid_units
 
-import unit_conversion as uc
+import nucos as uc
+from gnome.persist import (SchemaNode, Float, String, drop, Range,
+                           GeneralGnomeObjectSchema, SchemaNode, Float, String,
+                           drop, Range, LocalDateTime)
 from gnome.environment.water import WaterSchema
-from gnome.persist.base_schema import GeneralGnomeObjectSchema
 from gnome.environment.gridded_objects_base import VectorVariableSchema
 from gnome.environment.waves import WavesSchema
-from gnome.persist.extend_colander import LocalDateTime
+
 from gnome.persist.validators import convertible_to_seconds
+
 from gnome.utilities.inf_datetime import InfDateTime
 
 
@@ -44,11 +46,8 @@ class RemoveMass(object):
             rm_mass = uc.convert('Mass', units, 'kg', amount)
         else:
             # amount must be in volume units
-            water_temp = self.water.get('temperature')
-            rho = substance.density_at_temp(water_temp)
             rm_vol = uc.convert('Volume', units, 'm^3', amount)
-
-            rm_mass = rho * rm_vol
+            rm_mass = substance.standard_density * rm_vol
 
         return rm_mass
 
@@ -121,17 +120,23 @@ class CleanUpBase(RemoveMass, Weatherer):
 
     @property
     def efficiency(self):
+        '''
+        - Efficiency can be None since it indicates that we use wind
+          to compute efficiency.
+        - If efficiency is not None, it must be a number greater than
+          or equal to 0.0 and less than or equal to 1.0.
+        '''
         return self._efficiency
 
     @efficiency.setter
     def efficiency(self, value):
         '''
-            Update efficiency.
+        Update efficiency.
 
-            - Efficiency can be None since it indicates that we use wind
-              to compute efficiency.
-            - If efficiency is not None, it must be a number greater than
-              or equal to 0.0 and less than or equal to 1.0.
+        - Efficiency can be None since it indicates that we use wind
+          to compute efficiency.
+        - If efficiency is not None, it must be a number greater than
+          or equal to 0.0 and less than or equal to 1.0.
         '''
         if value is None:
             self._efficiency = value
@@ -153,20 +158,26 @@ class CleanUpBase(RemoveMass, Weatherer):
         water_frac:
 
             volume = sc['mass']/API_density
+
             (1 - sc['frac_water']) * oil_water_vol = volume
+
             oil_water_vol = volume / (1 - sc['frac_water'])
 
         Now, do a cumsum of oil_water_mass and find where
+
             np.cumsum(oil_water_vol) >= vol_to_remove
         and change the status_codes of these LEs. Can just as easily multiple
         everything by API_density to get
+
             np.cumsum(oil_water_mass) >= mass_to_remove
+
             mass_to_remove = sc['mass'] / (1 - sc['frac_water'])
         This is why the input is 'mass_to_remove' instead of 'vol_to_remove'
         - less computation
 
-        Note: For ChemicalDispersion, the mass_to_remove is not the mass of the
-            oil/water mixture, but the mass of the oil. Use the oilwater_mix
+        Note:
+            For ChemicalDispersion, the mass_to_remove is not the mass of
+            the oil/water mixture, but the mass of the oil. Use the oilwater_mix
             flag to indicate this is the case.
         '''
         arrays = {'fate_status', 'mass', 'frac_water'}
@@ -736,7 +747,7 @@ class ChemicalDispersionSchema(WeathererSchema):
                                   validator=Range(0, 1.0))
     efficiency = SchemaNode(Float(), save=True, update=True, missing=drop,
                             validator=Range(0, 1.0))
-    _rate = SchemaNode(Float(), save=True, update=True, missing=drop)
+    #_rate = SchemaNode(Float(), save=True, update=True, missing=drop)
     waves = WavesSchema(save=True, update=True, missing=drop,
                         save_reference=True)
 

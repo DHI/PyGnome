@@ -25,8 +25,8 @@ from gnome.environment import Wind, Tide
 from gnome.maps import MapFromBNA
 
 from gnome.model import Model
-from gnome.spill import point_line_release_spill
-from gnome.movers import RandomMover, WindMover, CatsMover
+from gnome.spills import surface_point_line_spill
+from gnome.movers import RandomMover, PointWindMover, CatsMover
 
 
 from gnome.outputters import Renderer
@@ -79,7 +79,7 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     series[1] = (start_time + timedelta(hours=18), (0, 270))
 
     wind = Wind(timeseries=series, units='m/s')
-    w_mover = WindMover(wind)
+    w_mover = PointWindMover(wind)
     wind.extrapolation_is_allowed=True
     model.movers += w_mover
 
@@ -116,7 +116,7 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     print('adding a spill')
 
     end_time = start_time + timedelta(hours=12)
-    spill = point_line_release_spill(num_elements=1000,
+    spill = surface_point_line_spill(num_elements=1000,
                                      release_time=start_time,
                                      start_position=(-66.16374,
                                                      18.468054, 0.0),

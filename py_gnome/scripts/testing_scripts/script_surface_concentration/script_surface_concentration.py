@@ -21,9 +21,9 @@ from gnome.utilities.projections import GeoProjection
 from gnome.environment import Wind
 
 from gnome.model import Model
-from gnome.spill import point_line_release_spill
+from gnome.spills import surface_point_line_spill
 
-from gnome.movers import RandomMover, WindMover
+from gnome.movers import RandomMover, PointWindMover
 
 from gnome.outputters import Renderer, NetCDFOutput, KMZOutput, ShapeOutput
 
@@ -79,14 +79,14 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     series[0] = (start_time, (5, 270))
     series[1] = (start_time + timedelta(hours=25), (5, 270))
 
-    w_mover = WindMover(Wind(timeseries=series, units='m/s'))
+    w_mover = PointWindMover(Wind(timeseries=series, units='m/s'))
     model.movers += w_mover
     model.environment += w_mover.wind
 
     print('adding a spill')
 
     end_time = start_time + timedelta(hours=12)
-    spill = point_line_release_spill(num_elements=100,
+    spill = surface_point_line_spill(num_elements=100,
                                      amount=10000,
                                      units='gal',
                                      start_position=(-70.0, 42, 0.0),

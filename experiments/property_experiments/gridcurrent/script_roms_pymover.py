@@ -14,12 +14,12 @@ from gnome.utilities.remote_data import get_datafile
 from gnome.model import Model
 
 from gnome.maps import MapFromBNA
-from gnome.spill import point_line_release_spill
+from gnome.spills import point_line_release_spill
 from gnome.movers import RandomMover, constant_wind_mover, GridCurrentMover
 
 from gnome.outputters import Renderer
 from gnome.environment import GridCurrent
-from gnome.movers.py_current_movers import PyCurrentMover
+from gnome.movers.py_current_movers import GridCurrentMover
 import gnome.utilities.profiledeco as pd
 
 # define base directory
@@ -113,7 +113,7 @@ def make_model(images_dir=os.path.join(base_dir, 'images')):
     # fn = 'dbofs_newFormat.nc'
 
     cf = GridCurrent.from_netCDF(filename=fn)
-    u_mover = PyCurrentMover(cf, extrapolate=True)
+    u_mover = GridCurrentMover(cf, extrapolate=True)
     # u_mover = GridCurrentMover(fn)
     renderer.add_grid(cf.grid)
 #     renderer.add_vec_prop(cf)

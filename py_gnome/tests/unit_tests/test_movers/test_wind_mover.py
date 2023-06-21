@@ -1,17 +1,13 @@
 
-
-
-
 from datetime import timedelta, datetime
 
 from pytest import raises
 
 import numpy as np
 import pytest
-import unit_conversion as uc
+import nucos
 
 from gnome.basic_types import datetime_value_2d, ts_format
-
 
 from gnome.utilities.projections import FlatEarthProjection
 from gnome.utilities.time_utils import date_to_sec, sec_to_date
@@ -21,19 +17,19 @@ from gnome.utilities import convert
 
 from gnome.environment import Wind
 
-from gnome.spill import point_line_release_spill
+from gnome.spills import surface_point_line_spill
 from gnome.spill_container import SpillContainer
-from gnome.spill.substance import NonWeatheringSubstance
+from gnome.spills.substance import NonWeatheringSubstance
 
-from gnome.movers import (WindMover,
-                          constant_wind_mover,
-                          wind_mover_from_file)
+from gnome.movers import (PointWindMover,
+                          constant_point_wind_mover,
+                          point_wind_mover_from_file)
 from gnome.exceptions import ReferencedObjectNotSet
 
 from ..conftest import sample_sc_release, testdata
 
 
-# WindMover tests
+# PointWindMover tests
 
 file_ = testdata['timeseries']['wind_ts']
 file2_ = testdata['timeseries']['wind_cardinal']
@@ -45,19 +41,19 @@ def test_exceptions():
     Test ValueError exception thrown if improper input arguments
     """
     with raises(ReferencedObjectNotSet) as excinfo:
-        wm = WindMover()
+        wm = PointWindMover()
         wm.prepare_for_model_run()
 
     print(excinfo.value)
 
     with raises(TypeError):
         """
-        violates duck typing so may want to remove. Though current WindMover's
+        violates duck typing so may want to remove. Though current PointWindMover's
         backend cython object looks for C++ OSSM object which is embedded in
         Wind object which is why this check was enforced. Can be
         re-evaluated if there is a need.
         """
-        WindMover(wind=10)
+        PointWindMover(wind=10)
 
 
 # tolerance for np.allclose(..) function
@@ -72,7 +68,7 @@ def test_read_file_init():
     """
 
     wind = Wind(filename=file_)
-    wm = WindMover(wind)
+    wm = PointWindMover(wind)
     wind_ts = wind.get_wind_data(coord_sys='uv', units='meter per second')
     _defaults(wm)  # check defaults set correctly
     assert not wm.make_default_refs
@@ -84,7 +80,7 @@ def test_read_file_init():
     #       but what the heck - do it here too.
 
     wind_ts = wind.get_wind_data(coord_sys=ts_format.uv)
-    cpp_timeseries['value'] = uc.convert('Velocity',
+    cpp_timeseries['value'] = nucos.convert('Velocity',
                                          'meter per second', wind.units,
                                          cpp_timeseries['value'])
 
@@ -95,7 +91,7 @@ def test_timeseries_init(wind_circ):
     """
     test default properties of the object are initialized correctly
     """
-    wm = WindMover(wind_circ['wind'])
+    wm = PointWindMover(wind_circ['wind'])
     _defaults(wm)
     assert not wm.make_default_refs
     cpp_timeseries = _get_timeseries_from_cpp(wm)
@@ -109,11 +105,11 @@ def test_empty_init():
     '''
     wind=None
     '''
-    wm = WindMover()
+    wm = PointWindMover()
     assert wm.make_default_refs
 
     _defaults(wm)
-    #assert wm.name == 'WindMover'
+    #assert wm.name == 'PointWindMover'
     print(wm.validate())
 
 
@@ -121,7 +117,7 @@ def test_properties(wind_circ):
     """
     test setting the properties of the object
     """
-    wm = WindMover(wind_circ['wind'])
+    wm = PointWindMover(wind_circ['wind'])
 
     wm.uncertain_duration = 1
     wm.uncertain_time_delay = 2
@@ -140,7 +136,7 @@ def test_data_start_stop(wind_circ):
     """
     test data_start / stop properties
     """
-    wm = WindMover(wind_circ['wind'])
+    wm = PointWindMover(wind_circ['wind'])
     assert wm.data_start == datetime(2012, 11, 6, 20, 10)
     assert wm.data_stop == datetime(2012, 11, 6, 20, 15)
 
@@ -148,10 +144,10 @@ def test_data_start_stop(wind_circ):
 def test_update_wind(wind_circ):
     """
     Create a wind object and update it's timeseries.
-    Make sure the internal C++ WindMover's properties have also changed
+    Make sure the internal C++ PointWindMover's properties have also changed
     """
     o_wind = wind_circ['wind']  # original wind value
-    wm = WindMover(o_wind)  # define wind mover
+    wm = PointWindMover(o_wind)  # define wind mover
 
     # update wind timeseries - default format is magnitude_direction
 
@@ -193,7 +189,7 @@ class TestPrepareForModelStep(object):
                                         dtype=datetime_value_2d).reshape(1),
                     units='meter per second')
 
-        wm = WindMover(wind)
+        wm = PointWindMover(wind)
         wm.prepare_for_model_run()
 
         for ix in range(2):
@@ -224,7 +220,7 @@ class TestPrepareForModelStep(object):
                                         dtype=datetime_value_2d).reshape(1),
                     units='meter per second')
 
-        wm = WindMover(wind)
+        wm = PointWindMover(wind)
         wm.prepare_for_model_run()
 
         for ix in range(2):
@@ -257,7 +253,7 @@ class TestPrepareForModelStep(object):
                                         dtype=datetime_value_2d).reshape(1),
                     units='meter per second')
 
-        wm = WindMover(wind)
+        wm = PointWindMover(wind)
         wm.prepare_for_model_run()
 
         for ix in range(2):
@@ -294,7 +290,7 @@ class TestPrepareForModelStep(object):
         wind = Wind(timeseries=time_series.reshape(3),
                     units='meter per second')
 
-        wm = WindMover(wind)
+        wm = PointWindMover(wind)
         wm.prepare_for_model_run()
 
         for ix in range(2):
@@ -324,7 +320,7 @@ class TestPrepareForModelStep(object):
         wind = Wind(timeseries=time_series.reshape(3),
                     units='meter per second')
 
-        wm = WindMover(wind)
+        wm = PointWindMover(wind)
         wm.prepare_for_model_run()
 
         for ix in range(2):
@@ -357,7 +353,7 @@ class TestPrepareForModelStep(object):
                     extrapolation_is_allowed=True,
                     units='meter per second')
 
-        wm = WindMover(wind)
+        wm = PointWindMover(wind)
         wm.prepare_for_model_run()
 
         for ix in range(2):
@@ -396,7 +392,7 @@ class TestPrepareForModelStep(object):
                     extrapolation_is_allowed=True,
                     units='meter per second')
 
-        wm = WindMover(wind)
+        wm = PointWindMover(wind)
         wm.prepare_for_model_run()
 
         for ix in range(2):
@@ -415,7 +411,7 @@ class TestPrepareForModelStep(object):
 
 class TestWindMover(object):
     """
-    gnome.WindMover() test
+    gnome.PointWindMover() test
     """
     time_step = 15 * 60  # seconds
     model_time = datetime(2012, 8, 20, 13)  # yyyy/month/day/hr/min/sec
@@ -424,23 +420,23 @@ class TestWindMover(object):
     time_val = np.array((model_time, (2., 25.)),
                         dtype=datetime_value_2d).reshape(1)
     wind = Wind(timeseries=time_val, units='meter per second')
-    wm = WindMover(wind)
+    wm = PointWindMover(wind)
 
     wm.prepare_for_model_run()
 
     def test_string_repr_no_errors(self):
         print()
         print('======================')
-        print('repr(WindMover): ')
+        print('repr(PointWindMover): ')
         print(repr(self.wm))
         print()
-        print('str(WindMover): ')
+        print('str(PointWindMover): ')
         print(str(self.wm))
         assert True
 
     def test_get_move(self):
         """
-        Test the get_move(...) results in WindMover match the expected delta
+        Test the get_move(...) results in PointWindMover match the expected delta
         """
         for ix in range(2):
             curr_time = sec_to_date(date_to_sec(self.model_time) +
@@ -454,7 +450,7 @@ class TestWindMover(object):
             tol = 1e-8
 
             msg = ('{0} is not within a tolerance of '
-                   '{1}'.format('WindMover.get_move()', tol))
+                   '{1}'.format('PointWindMover.get_move()', tol))
             np.testing.assert_allclose(delta, actual, tol, tol, msg, 0)
 
             assert self.wm.active
@@ -507,7 +503,7 @@ def test_windage_index():
     rel_time = datetime(2013, 1, 1, 0, 0)
     timestep = 30
     for i in range(2):
-        spill = point_line_release_spill(num_elements=5,
+        spill = surface_point_line_spill(num_elements=5,
                                          start_position=(0., 0., 0.),
                                          release_time=rel_time + i * timedelta(hours=1),
                                          substance=NonWeatheringSubstance(windage_range=(i * .01 +
@@ -520,7 +516,7 @@ def test_windage_index():
     sc.prepare_for_model_run(array_types=spill.array_types)
     sc.release_elements(timestep, rel_time)
 
-    wm = constant_wind_mover(5, 0)
+    wm = constant_point_wind_mover(5, 0)
     wm.prepare_for_model_step(sc, timestep, rel_time)
     wm.model_step_is_done()  # need this to toggle _windage_is_set_flag
 
@@ -562,7 +558,7 @@ def test_timespan():
     time_val['time'] = rel_time
     time_val['value'] = (2., 25.)
 
-    wm = WindMover(Wind(timeseries=time_val,
+    wm = PointWindMover(Wind(timeseries=time_val,
                         units='meter per second'),
                    active_range=(model_time + timedelta(seconds=time_step),
                                  InfDateTime('inf')))
@@ -604,7 +600,7 @@ def test_active():
     time_val['time'] = rel_time
     time_val['value'] = (2., 25.)
 
-    wm = WindMover(Wind(timeseries=time_val, units='meter per second'),
+    wm = PointWindMover(Wind(timeseries=time_val, units='meter per second'),
                    on=False)
 
     wm.prepare_for_model_run()
@@ -617,16 +613,14 @@ def test_active():
     assert np.all(delta == 0)  # model_time + time_step = active_start
 
 
-def test_constant_wind_mover():
+def test_constant_point_wind_mover():
     """
-    tests the constant_wind_mover utility function
+    tests the constant_point_wind_mover utility function
     """
-    with raises(Exception):
-        # it should raise an InvalidUnitError, but I don't want to have to
-        # import unit_conversion just for that...
-        _wm = constant_wind_mover(10, 45, units='some_random_string')
+    with raises(nucos.InvalidUnitError):
+        _wm = constant_point_wind_mover(10, 45, units='some_random_string')
 
-    wm = constant_wind_mover(10, 45, units='m/s')
+    wm = constant_point_wind_mover(10, 45, units='m/s')
 
     sc = sample_sc_release(1)
 
@@ -640,26 +634,26 @@ def test_constant_wind_mover():
     assert delta[0][0] == delta[0][1]
 
 
-def test_constant_wind_mover_bounds():
-    wm = constant_wind_mover(10, 45, units='knots')
+def test_constant_point_wind_mover_bounds():
+    wm = constant_point_wind_mover(10, 45, units='knots')
 
     assert wm.data_start == wm.data_stop
 
 
-def test_wind_mover_from_file():
-    wm = wind_mover_from_file(file_)
+def test_point_wind_mover_from_file():
+    wm = point_wind_mover_from_file(file_)
     print(wm.wind.filename)
     assert wm.wind.filename == file_
 
 
-def test_wind_mover_from_file_cardinal():
-    wm = wind_mover_from_file(file2_)
+def test_point_wind_mover_from_file_cardinal():
+    wm = point_wind_mover_from_file(file2_)
     print(wm.wind.filename)
     assert wm.wind.filename == file2_
 
 
-def test_wind_mover_from_file_kph_units():
-    wm = wind_mover_from_file(filekph_)
+def test_point_wind_mover_from_file_kph_units():
+    wm = point_wind_mover_from_file(filekph_)
     print(wm.wind.filename)
     assert wm.wind.filename == filekph_
 
@@ -667,10 +661,10 @@ def test_wind_mover_from_file_kph_units():
 def test_serialize_deserialize(wind_circ):
     """
     tests and illustrate the funcitonality of serialize/deserialize for
-    WindMover.
+    PointWindMover.
     """
     wind = Wind(filename=file_)
-    wm = WindMover(wind)
+    wm = PointWindMover(wind)
     serial = wm.serialize()
     assert 'wind' in serial
 
@@ -683,10 +677,10 @@ def test_serialize_deserialize(wind_circ):
 # def test_save_load(save_ref, saveloc_):
 #     """
 #     tests and illustrates the functionality of save/load for
-#     WindMover
+#     PointWindMover
 #     """
 #     wind = Wind(filename=file_)
-#     wm = WindMover(wind)
+#     wm = PointWindMover(wind)
 #     wm_fname = 'WindMover_save_test.json'
 #     refs = None
 #     if save_ref:
@@ -706,10 +700,10 @@ def test_serialize_deserialize(wind_circ):
 
 def test_array_types():
     """
-    Check the array_types property of WindMover contains array_types.WindMover
+    Check the array_types property of PointWindMover contains array_types.PointWindMover
     """
-    # WindMover does not modify Wind object!
-    wm = WindMover(Wind(filename=file_))
+    # PointWindMover does not modify Wind object!
+    wm = PointWindMover(Wind(filename=file_))
 
     for t in ('windages', 'windage_range', 'windage_persist'):
         assert t in wm.array_types
@@ -717,7 +711,7 @@ def test_array_types():
 
 def _defaults(wm):
     """
-    checks the default properties of the WindMover object as given in the input
+    checks the default properties of the PointWindMover object as given in the input
     are as expected
     """
     # timespan is as big as possible
@@ -728,7 +722,7 @@ def _defaults(wm):
     assert wm.uncertain_angle_scale == 0.4
 
 
-def _get_timeseries_from_cpp(windmover):
+def _get_timeseries_from_cpp(PointWindMover):
     """
     local method for tests - returns the timeseries used internally
     by the C++ WindMover_c object.
@@ -739,9 +733,9 @@ def _get_timeseries_from_cpp(windmover):
 
     This is simply used for testing.
     """
-    dtv = windmover.wind.get_wind_data(coord_sys=ts_format.uv)
+    dtv = PointWindMover.wind.get_wind_data(coord_sys=ts_format.uv)
     tv = convert.to_time_value_pair(dtv, ts_format.uv)
-    val = windmover.mover.get_time_value(tv['time'])
+    val = PointWindMover.mover.get_time_value(tv['time'])
 
     tv['value']['u'] = val['u']
     tv['value']['v'] = val['v']
@@ -755,7 +749,7 @@ def _assert_timeseries_equivalence(cpp_timeseries, wind_ts):
     """
     print()
     print('=====================')
-    print('WindMover timeseries [time], [u, v]: ')
+    print('PointWindMover timeseries [time], [u, v]: ')
     print(cpp_timeseries['time'])
     print(cpp_timeseries['value'])
     print('---------------------')

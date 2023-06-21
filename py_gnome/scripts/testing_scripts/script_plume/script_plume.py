@@ -11,19 +11,14 @@ This is simply making a point source with a given distribution of droplet sizes
 
 """
 
-
-
-
-
-
 import os
 from datetime import datetime, timedelta
 
 import gnome.scripting as gs
 from gnome.utilities.distributions import WeibullDistribution
 
-from gnome.spill.substance import NonWeatheringSubstance
-from gnome.spill.initializers import plume_initializers
+from gnome.spills.substance import NonWeatheringSubstance
+# from gnome.spills.initializers import plume_initializers
 
 # define base directory
 base_dir = os.path.dirname(__file__)
@@ -69,23 +64,15 @@ def make_model():
                              min_=.0002)  # 200 micron min
     end_time = start_time + timedelta(hours=24)
 
-    # at this point only one non-weathering substance is allowed; this should change in the future
-    substance=NonWeatheringSubstance(standard_density=900,
-                                     initializers=plume_initializers(distribution=wd))
-
-    spill =  gs.subsurface_plume_spill(num_elements=50,
-                                       start_position=(-76.126872, 37.680952,
-                                                       1700.0),
-                                       release_time=start_time,
-                                       distribution=wd,
-                                       amount=90,  # default volume_units=m^3
-                                       units='m^3',
-                                       end_release_time=end_time,
-                                       # substance='oil_crude',
-                                       # substance=NonWeatheringSubstance(standard_density=900),
-                                       substance=substance,
-                                       # density=900,
-                                       )
+    spill = gs.subsurface_spill(num_elements=50,
+                                start_position=(-76.126872, 37.680952, 1700.0),
+                                release_time=start_time,
+                                distribution=wd,
+                                amount=90,  # default volume_units=m^3
+                                units='m^3',
+                                end_release_time=end_time,
+                                substance=NonWeatheringSubstance(standard_density=900),
+                                )
 
     model.spills += spill
 
@@ -93,18 +80,14 @@ def make_model():
                              lambda_=.00456,
                              max_=.0002)  # 200 micron max
 
-    spill = gs.point_line_release_spill(num_elements=50,
-                                        units='m^3',
-                                        start_position=(-76.126872,
-                                                        37.680952,
-                                                        1800.0),
-                                        release_time=start_time,
-                                        amount=90,
-                                        # element_type=plume(distribution=wd,
-                                        #                    density=900.0)
-                                        # substance = NonWeatheringSubstance(initializers=plume_initializers(distribution=wd))
-                                        substance=substance
-                                        )
+    spill = gs.subsurface_spill(num_elements=50,
+                                units='m^3',
+                                start_position=(-76.126872, 37.680952, 1800.0),
+                                release_time=start_time,
+                                distribution = wd,
+                                amount=90,
+                                substance = NonWeatheringSubstance(standard_density=900),
+                                )
     model.spills += spill
 
     print('adding a RandomMover:')
@@ -127,11 +110,11 @@ def make_model():
     # wind = Wind(timeseries=series, units='knot')
     #
     # default is .4 radians
-    # w_mover = gnome.movers.WindMover(wind, uncertain_angle_scale=0)
+    # w_mover = gnome.movers.PointWindMover(wind, uncertain_angle_scale=0)
     #
     # model.movers += w_mover
 
-    print('adding a simple mover:')
+    print('adding a steady uniform current:')
     s_mover = gs.SimpleMover(velocity=(0.0, -.3, 0.0))
     model.movers += s_mover
 
@@ -143,4 +126,5 @@ if __name__ == "__main__":
     model = make_model()
     print("about to start running the model")
     for step in model:
-        print(step)
+        print(f"step: {step['step_num']}")
+        #print(step)

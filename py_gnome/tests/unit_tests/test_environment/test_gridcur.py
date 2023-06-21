@@ -9,11 +9,13 @@ import numpy as np
 
 import pytest
 
-from gnome.basic_types import oil_status  # .in_water
+from ..conftest import sample_sc_release
+
+from gnome.basic_types import oil_status, status_code_type  # .in_water
 from gnome.environment import gridcur
 
-from gnome.movers import PyCurrentMover
-from gnome.spill import grid_spill
+from gnome.movers import CurrentMover
+from gnome.spills import grid_spill
 
 import gnome.scripting as gs
 
@@ -192,7 +194,7 @@ def test_make_mover_from_gridcur():
     """
     current = gridcur.from_gridcur(filename=test_data_dir / NODE_EXAMPLE)
 
-    mover = PyCurrentMover(current=current)
+    mover = CurrentMover(current=current)
 
     assert mover.data_start == datetime(2020, 7, 14, 12)
     assert mover.data_stop == datetime(2020, 7, 15, 0)
@@ -200,7 +202,7 @@ def test_make_mover_from_gridcur():
 
 def test_mover_get_move():
     current = gridcur.from_gridcur(filename=test_data_dir / NODE_EXAMPLE)
-    mover = PyCurrentMover(current=current)
+    mover = CurrentMover(current=current)
 
     # create a minimal spill container
     model_time_datetime = datetime(2020, 7, 14, 12)
@@ -209,12 +211,15 @@ def test_mover_get_move():
                                   (-87.0, 29.5, 0.0),  # near middle of grid
                                   (-89.0, 27.5, 0.0),  # outside the grid
                                   ])
-    status_codes = np.array([oil_status.in_water,
+    status_codes = np.array([oil_status.in_water,  # this is the default
                              oil_status.in_water,
-                             oil_status.in_water])
-    sc = {'positions': initial_positions,
-          'status_codes': status_codes}
-    deltas = mover.get_move(sc, time_step, model_time_datetime)
+                             oil_status.in_water],
+                             dtype=status_code_type)
+    num_le = 3
+    pSpill = sample_sc_release(num_le, (0.,0.,0), model_time_datetime)
+    pSpill['status_codes'] = status_codes
+    pSpill['positions'] = initial_positions
+    deltas = mover.get_move(pSpill, time_step, model_time_datetime)
 
     print("deltas are:", deltas)
 
@@ -234,7 +239,7 @@ def test_cell_not_supported():
 def test_in_model():
 
     current = gridcur.from_gridcur(filename=test_data_dir / NODE_EXAMPLE)
-    mover = PyCurrentMover(current=current)
+    mover = CurrentMover(current=current)
 
     start_time = "2020-07-14T12:00"
     model = gs.Model(time_step=gs.hours(1),
