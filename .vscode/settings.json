@@ -1,0 +1,6 @@
+{
+    "scm.providerCountBadge": "visible",
+    "files.exclude": {
+        "**/.git": false
+    }
+}
